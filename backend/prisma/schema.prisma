@@ -6,3 +6,91 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Role {
+  OPERATOR
+  SUPERVISOR
+  ADMIN
+}
+
+enum EquipmentStatus {
+  ACTIVE
+  RETIRED
+}
+
+enum CleaningRecordStatus {
+  PENDING
+  VERIFIED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  role         Role     @default(OPERATOR)
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  cleaningRecords CleaningRecord[] @relation("CleanedBy")
+  auditEntries    AuditEntry[]
+
+  @@map("users")
+}
+
+model Equipment {
+  id     String          @id @default(cuid())
+  name   String
+  code   String          @unique
+  status EquipmentStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cleaningRecords CleaningRecord[]
+
+  @@map("equipment")
+}
+
+model CleaningRecord {
+  id          String               @id @default(cuid())
+  equipmentId String
+  cleanedById String
+  cleanedAt   DateTime
+  method      String
+  notes       String?
+  status      CleaningRecordStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  equipment    Equipment    @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  cleanedBy    User         @relation("CleanedBy", fields: [cleanedById], references: [id], onDelete: Restrict)
+  auditEntries AuditEntry[]
+
+  @@index([equipmentId])
+  @@index([cleanedById])
+  @@map("cleaning_records")
+}
+
+model AuditEntry {
+  id               String      @id @default(cuid())
+  cleaningRecordId String
+  userId           String
+  action           AuditAction
+  /// Field-level diffs: { "status": { "old": "PENDING", "new": "VERIFIED" }, ... }
+  changes          Json
+  createdAt        DateTime    @default(now())
+
+  cleaningRecord CleaningRecord @relation(fields: [cleaningRecordId], references: [id], onDelete: Cascade)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([cleaningRecordId])
+  @@index([userId])
+  @@map("audit_entries")
+}
