@@ -1,5 +1,5 @@
 import type { ComponentProps } from "react";
-import { Input } from "@/ui/input/Input";
+import { Input } from "./Input";
 
 type Props = {
   id: string;

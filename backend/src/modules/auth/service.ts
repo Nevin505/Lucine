@@ -30,8 +30,8 @@ export async function login(input: LoginInput) {
     ok: true as const,
     status: 200 as const,
     body: {
-      token: signToken(user.id),
       user: publicUser,
     },
+    token: signToken(user.id),
   };
 }

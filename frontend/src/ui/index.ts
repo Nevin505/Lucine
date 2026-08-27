@@ -1,4 +1,5 @@
-export { Button } from "./button/Button";
-export { Input } from "./input/Input";
-export { Field } from "./field/Field";
-export { Card } from "./card/Card";
+export { Button } from "./Button";
+export { Input } from "./Input";
+export { Field } from "./Field";
+export { Card } from "./Card";
+export { Modal } from "./Modal";

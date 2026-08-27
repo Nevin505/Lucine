@@ -2,8 +2,6 @@ import { isAxiosError } from "axios";
 import { z } from "zod";
 import { api } from "./api";
 
-export { clearToken, getToken, setToken } from "./token";
-
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
   password: z.string().min(1, "Password is required"),
@@ -42,12 +40,9 @@ function parseApiError(error: unknown): string {
 
 export async function loginRequest(
   input: LoginInput,
-): Promise<{ token: string; user: AuthUser }> {
+): Promise<{ user: AuthUser }> {
   try {
-    const { data } = await api.post<{ token: string; user: AuthUser }>(
-      "/auth/login",
-      input,
-    );
+    const { data } = await api.post<{ user: AuthUser }>("/auth/login", input);
     return data;
   } catch (error) {
     throw new Error(parseApiError(error), { cause: error });
@@ -58,6 +53,14 @@ export async function meRequest(): Promise<AuthUser> {
   try {
     const { data } = await api.get<AuthUser>("/auth/me");
     return data;
+  } catch (error) {
+    throw new Error(parseApiError(error), { cause: error });
+  }
+}
+
+export async function logoutRequest(): Promise<void> {
+  try {
+    await api.post("/auth/logout");
   } catch (error) {
     throw new Error(parseApiError(error), { cause: error });
   }

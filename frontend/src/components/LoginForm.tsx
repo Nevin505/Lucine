@@ -3,7 +3,7 @@ import { Button, Field } from "@/ui";
 import { loginRequest, loginSchema, type AuthUser } from "@/lib/auth";
 
 type Props = {
-  onSuccess: (user: AuthUser, token: string) => void;
+  onSuccess: (user: AuthUser) => void;
 };
 
 export function LoginForm({ onSuccess }: Props) {
@@ -31,8 +31,8 @@ export function LoginForm({ onSuccess }: Props) {
     setFieldErrors({});
     setPending(true);
     try {
-      const { token, user } = await loginRequest(parsed.data);
-      onSuccess(user, token);
+      const { user } = await loginRequest(parsed.data);
+      onSuccess(user);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Login failed");
     } finally {

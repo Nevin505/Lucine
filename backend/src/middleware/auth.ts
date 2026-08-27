@@ -7,6 +7,16 @@ type JwtPayload = {
   sub: string;
 };
 
+export const AUTH_COOKIE_NAME = "token";
+
+export const authCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: "strict" as const,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
+  path: "/",
+};
+
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
@@ -25,9 +35,10 @@ export async function requireAuth(
   next: NextFunction,
 ) {
   const header = req.headers.authorization;
-  const token = header?.startsWith("Bearer ")
+  const bearerToken = header?.startsWith("Bearer ")
     ? header.slice("Bearer ".length).trim()
     : undefined;
+  const token = req.cookies?.[AUTH_COOKIE_NAME] ?? bearerToken;
 
   if (!token) {
     return res.status(401).json({ error: "Unauthorized" });

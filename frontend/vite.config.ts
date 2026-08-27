@@ -13,12 +13,4 @@ export default defineConfig({
       "@/lib": path.resolve(import.meta.dirname, "./src/lib"),
     },
   },
-  server: {
-    proxy: {
-      "/auth": {
-        target: "http://localhost:3001",
-        changeOrigin: true,
-      },
-    },
-  },
 });

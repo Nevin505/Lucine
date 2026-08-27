@@ -1,7 +1,9 @@
 import "dotenv/config";
+import cookieParser from "cookie-parser";
 import cors from "cors";
 import express, { Request, Response } from "express";
 import authRoutes from "./modules/auth/routes";
+import equipmentRoutes from "./modules/equipment/routes";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -9,8 +11,10 @@ const PORT = process.env.PORT || 3000;
 app.use(
   cors({
     origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
   }),
 );
+app.use(cookieParser());
 app.use(express.json());
 
 app.get("/", (_req: Request, res: Response) => {
@@ -18,6 +22,7 @@ app.get("/", (_req: Request, res: Response) => {
 });
 
 app.use("/auth", authRoutes);
+app.use("/equipment", equipmentRoutes);
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
