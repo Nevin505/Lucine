@@ -51,6 +51,7 @@ All seeded users share the same password. The app is at **http://localhost:5173*
 ## With more time
 
 - **Async audit logging** — write audit entries in a background worker instead of blocking the API request.
+- **Standardized API errors** — introduce a custom error class so routes return consistent `{ error, status, details? }` responses instead of ad-hoc objects in each service.
 - **E2E tests** (Playwright) covering login → create record → edit → view audit log.
 - **Production deployment** — HTTPS, secure cookies, env-based API URL on the frontend (currently hardcoded to `localhost:3001`).
 - **Optimistic UI updates** and better error/loading states on the frontend.
