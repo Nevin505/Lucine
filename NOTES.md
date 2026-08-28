@@ -58,6 +58,5 @@ All seeded users share the same password. The app is at **http://localhost:5173*
 
 ## Deliberately left out
 
-- **Roles and permissions** — no role-based access control; authentication only (logged in vs not)
 - User registration, password reset, and account management
 - Soft-delete for cleaning records (records are immutable in spirit; only updates are audited)
