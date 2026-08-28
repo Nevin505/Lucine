@@ -1,5 +1,19 @@
 # Notes
 
+## Demo login
+
+After running the seed (`npm run prisma:seed` locally, or automatically via Docker on startup), use any of these accounts:
+
+| Email | Password |
+|-------|----------|
+| `operator@example.com` | `password123` |
+| `maria.santos@example.com` | `password123` |
+| `james.chen@example.com` | `password123` |
+| `priya.patel@example.com` | `password123` |
+| `leo.martin@example.com` | `password123` |
+
+All seeded users share the same password. The app is at **http://localhost:5173** (frontend) with the API at **http://localhost:3001**.
+
 ## Key decisions
 
 ### Stack and architecture
@@ -37,6 +51,7 @@
 
 ## With more time
 
+- **Async audit logging** — write audit entries in a background worker instead of blocking the API request.
 - **E2E tests** (Playwright) covering login → create record → edit → view audit log.
 - **Production deployment** — HTTPS, secure cookies, env-based API URL on the frontend (currently hardcoded to `localhost:3001`).
 - **Unified pagination** — migrate equipment list to cursor-based paging for consistency.

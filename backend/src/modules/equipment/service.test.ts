@@ -62,7 +62,7 @@ describe("listEquipment", () => {
       expect.objectContaining({
         skip: 10,
         take: 10,
-        orderBy: { name: "asc" },
+        orderBy: { createdAt: "desc" },
       }),
     );
     expect(result).toMatchObject({

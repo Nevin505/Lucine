@@ -27,7 +27,7 @@ export async function listEquipment(query: ListEquipmentQuery) {
   const [items, total] = await Promise.all([
     prisma.equipment.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: { createdAt: "desc" },
       skip,
       take: query.pageSize,
     }),
