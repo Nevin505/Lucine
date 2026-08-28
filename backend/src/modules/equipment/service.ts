@@ -1,4 +1,10 @@
 import { Prisma } from "../../generated/prisma/client";
+import {
+  encodeCursor,
+  parseCursor,
+  rowsAfter,
+  toPage,
+} from "../../lib/pagination";
 import { prisma } from "../../lib/prisma";
 import type {
   CreateEquipmentInput,
@@ -8,6 +14,7 @@ import type {
 
 const codeExistsError = { error: "Equipment code already exists" as const };
 const notFoundError = { error: "Equipment not found" as const };
+const invalidCursor = { error: "Invalid cursor" as const };
 const hasHistoryError = {
   error:
     "Equipment has cleaning history and cannot be deleted. Retire it instead." as const,
@@ -21,34 +28,32 @@ function isUniqueCodeConflict(err: unknown): boolean {
 }
 
 export async function listEquipment(query: ListEquipmentQuery) {
-  const nameQuery = query.name?.trim();
-  const where: Prisma.EquipmentWhereInput = {
-    ...(query.status ? { status: query.status } : {}),
-    ...(nameQuery
-      ? { name: { contains: nameQuery, mode: "insensitive" } }
-      : {}),
-  };
-  const skip = (query.page - 1) * query.pageSize;
+  const cursor = query.cursor ? parseCursor(query.cursor) : null;
+  if (query.cursor && !cursor) {
+    return { ok: false as const, status: 400 as const, body: invalidCursor };
+  }
 
-  const [items, total] = await Promise.all([
-    prisma.equipment.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: query.pageSize,
-    }),
-    prisma.equipment.count({ where }),
-  ]);
+  const nameQuery = query.name?.trim();
+  const rows = await prisma.equipment.findMany({
+    where: {
+      ...(query.status ? { status: query.status } : {}),
+      ...(nameQuery
+        ? { name: { contains: nameQuery, mode: "insensitive" } }
+        : {}),
+      ...(cursor ? rowsAfter("createdAt", cursor) : {}),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: query.limit + 1,
+  });
+
+  const { items, pageInfo } = toPage(rows, query.limit, (row) =>
+    encodeCursor(row.createdAt, row.id),
+  );
 
   return {
     ok: true as const,
     status: 200 as const,
-    body: {
-      items,
-      page: query.page,
-      pageSize: query.pageSize,
-      total,
-    },
+    body: { items, pageInfo },
   };
 }
 

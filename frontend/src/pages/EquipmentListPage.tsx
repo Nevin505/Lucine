@@ -100,7 +100,8 @@ export function EquipmentListPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = parseStatusFilter(searchParams.get("status"));
   const nameFilter = searchParams.get("name")?.trim() ?? "";
-  const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   const [nameInput, setNameInput] = useState(nameFilter);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -112,6 +113,11 @@ export function EquipmentListPage() {
   }, [nameFilter]);
 
   useEffect(() => {
+    setCursor(undefined);
+    setCursorStack([]);
+  }, [statusFilter, nameFilter]);
+
+  useEffect(() => {
     const timer = window.setTimeout(() => {
       const trimmed = nameInput.trim();
       if (trimmed === nameFilter) return;
@@ -119,7 +125,6 @@ export function EquipmentListPage() {
       const params = new URLSearchParams(searchParams);
       if (trimmed) params.set("name", trimmed);
       else params.delete("name");
-      params.delete("page");
       setSearchParams(params);
     }, 300);
 
@@ -133,32 +138,41 @@ export function EquipmentListPage() {
       listEquipment({
         ...(statusFilter === "ALL" ? {} : { status: statusFilter }),
         ...(nameFilter ? { name: nameFilter } : {}),
-        page,
-        pageSize: PAGE_SIZE,
+        ...(cursor ? { cursor } : {}),
+        limit: PAGE_SIZE,
       }),
-    [nameFilter, page, statusFilter],
+    [cursor, nameFilter, statusFilter],
   );
 
   const { data, loading, error, refetch } =
     useFetch<EquipmentListResponse>(fetcher);
 
   const items = data?.items ?? [];
-  const total = data?.total ?? 0;
+  const hasNextPage = data?.pageInfo.hasNextPage ?? false;
+  const hasPreviousPage = cursorStack.length > 0;
 
   function setFilter(next: EquipmentStatus | "ALL") {
     setActionError(null);
     const params = new URLSearchParams(searchParams);
     if (next !== "ALL") params.set("status", next);
     else params.delete("status");
-    params.delete("page");
     setSearchParams(params);
   }
 
-  function setPage(nextPage: number) {
-    const params = new URLSearchParams(searchParams);
-    if (nextPage <= 1) params.delete("page");
-    else params.set("page", String(nextPage));
-    setSearchParams(params);
+  function goNext() {
+    const endCursor = data?.pageInfo.endCursor;
+    if (!endCursor) return;
+    setCursorStack((stack) => [...stack, cursor ?? ""]);
+    setCursor(endCursor);
+  }
+
+  function goPrevious() {
+    setCursorStack((stack) => {
+      const next = [...stack];
+      const previous = next.pop();
+      setCursor(previous === "" ? undefined : previous);
+      return next;
+    });
   }
 
   async function handleDelete(equipment: Equipment) {
@@ -166,12 +180,9 @@ export function EquipmentListPage() {
     setDeletingId(equipment.id);
     try {
       await deleteEquipment(equipment.id);
-      const nextTotal = total - 1;
-      const nextPages = Math.max(1, Math.ceil(nextTotal / PAGE_SIZE));
-      if (page > nextPages) {
-        setPage(nextPages);
-      } else {
-        await refetch();
+      await refetch();
+      if (items.length === 1 && hasPreviousPage) {
+        goPrevious();
       }
     } catch (err) {
       setActionError(
@@ -267,10 +278,11 @@ export function EquipmentListPage() {
               : "No equipment found. Add one to get started."
           }
           pagination={{
-            page,
-            pageSize: PAGE_SIZE,
-            total,
-            onPageChange: setPage,
+            mode: "cursor",
+            hasNextPage,
+            hasPreviousPage,
+            onNext: goNext,
+            onPrevious: goPrevious,
             disabled: loading,
           }}
         />

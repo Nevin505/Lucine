@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encodeCursor } from "../../lib/pagination";
 import { Prisma } from "../../generated/prisma/client";
 
 const {
   findMany,
-  count,
   findUnique,
   create,
   update,
@@ -11,7 +11,6 @@ const {
   cleaningRecordCount,
 } = vi.hoisted(() => ({
   findMany: vi.fn(),
-  count: vi.fn(),
   findUnique: vi.fn(),
   create: vi.fn(),
   update: vi.fn(),
@@ -23,7 +22,6 @@ vi.mock("../../lib/prisma", () => ({
   prisma: {
     equipment: {
       findMany,
-      count,
       findUnique,
       create,
       update,
@@ -48,57 +46,97 @@ function prismaError(code: string) {
   });
 }
 
+const createdAt = new Date("2026-01-15T10:00:00.000Z");
+
 describe("listEquipment", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    findMany.mockResolvedValue([{ id: "eq-1", name: "Tank A" }]);
-    count.mockResolvedValue(1);
+    findMany.mockResolvedValue([{ id: "eq-1", name: "Tank A", createdAt }]);
   });
 
-  it("returns paginated equipment", async () => {
-    const result = await listEquipment({ page: 2, pageSize: 10 });
+  it("fetches the first page with limit + 1", async () => {
+    const result = await listEquipment({ limit: 10 });
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 10,
-        take: 10,
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 11,
       }),
     );
     expect(result).toMatchObject({
       ok: true,
       status: 200,
       body: {
-        page: 2,
-        pageSize: 10,
-        total: 1,
-        items: [{ id: "eq-1", name: "Tank A" }],
+        items: [{ id: "eq-1", name: "Tank A", createdAt }],
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: encodeCursor(createdAt, "eq-1"),
+        },
       },
     });
   });
 
-  it("filters by status when provided", async () => {
-    await listEquipment({ page: 1, pageSize: 20, status: "RETIRED" });
+  it("applies a cursor filter when provided", async () => {
+    const cursor = encodeCursor(createdAt, "eq-1");
+
+    await listEquipment({ limit: 10, cursor });
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: "RETIRED" },
+        where: expect.objectContaining({
+          OR: expect.any(Array),
+        }),
+        take: 11,
       }),
     );
-    expect(count).toHaveBeenCalledWith({ where: { status: "RETIRED" } });
+  });
+
+  it("returns hasNextPage when an extra row is fetched", async () => {
+    findMany.mockResolvedValue(
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `eq-${i}`,
+        name: `Tank ${i}`,
+        createdAt,
+      })),
+    );
+
+    const result = await listEquipment({ limit: 3 });
+
+    expect(result.body.items).toHaveLength(3);
+    expect(result.body.pageInfo.hasNextPage).toBe(true);
+  });
+
+  it("filters by status when provided", async () => {
+    await listEquipment({ limit: 20, status: "RETIRED" });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: "RETIRED" }),
+      }),
+    );
   });
 
   it("filters by name when provided", async () => {
-    await listEquipment({ page: 1, pageSize: 20, name: "auto" });
+    await listEquipment({ limit: 20, name: "auto" });
 
     expect(findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { name: { contains: "auto", mode: "insensitive" } },
+        where: expect.objectContaining({
+          name: { contains: "auto", mode: "insensitive" },
+        }),
       }),
     );
-    expect(count).toHaveBeenCalledWith({
-      where: { name: { contains: "auto", mode: "insensitive" } },
+  });
+
+  it("returns 400 for an invalid cursor", async () => {
+    const result = await listEquipment({ limit: 10, cursor: "not-a-cursor" });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      body: { error: "Invalid cursor" },
     });
+    expect(findMany).not.toHaveBeenCalled();
   });
 });
 

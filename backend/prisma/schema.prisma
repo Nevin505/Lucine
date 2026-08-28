@@ -54,6 +54,7 @@ model Equipment {
 
   cleaningRecords CleaningRecord[]
 
+  @@index([createdAt, id])
   @@map("equipment")
 }
 

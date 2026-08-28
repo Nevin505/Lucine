@@ -39,16 +39,17 @@ export type EquipmentDetail = Equipment & {
 
 export type EquipmentListResponse = {
   items: Equipment[];
-  page: number;
-  pageSize: number;
-  total: number;
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 };
 
 export type ListEquipmentParams = {
   status?: EquipmentStatus;
   name?: string;
-  page?: number;
-  pageSize?: number;
+  cursor?: string;
+  limit?: number;
 };
 
 type ApiErrorBody = {

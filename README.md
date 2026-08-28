@@ -136,7 +136,7 @@ All routes except `/auth/login` require authentication (JWT in an httpOnly cooki
 | `POST`   | `/auth/login`                                                | Log in                                                   |
 | `POST`   | `/auth/logout`                                               | Log out                                                  |
 | `GET`    | `/auth/me`                                                   | Current user                                             |
-| `GET`    | `/equipment`                                                 | List equipment (offset pagination)                       |
+| `GET`    | `/equipment`                                                 | List equipment (cursor pagination)                       |
 | `POST`   | `/equipment`                                                 | Create equipment                                         |
 | `GET`    | `/equipment/:id`                                             | Equipment detail                                         |
 | `PATCH`  | `/equipment/:id`                                             | Update equipment                                         |

@@ -28,9 +28,8 @@ All seeded users share the same password. The app is at **http://localhost:5173*
 - **No role-based authorization** — any logged-in user can perform all actions. There is no permission checking by role.
 
 ### Pagination strategy
-- **Equipment list** uses offset pagination (`page` / `pageSize`) — the dataset is small and random access is useful.
-- **Cleaning records and audit entries** use **keyset (cursor) pagination** sorted by date + id. This avoids offset drift when rows are inserted during paging and scales better for long histories.
-- Composite indexes on `(equipmentId, cleanedAt, id)` and `(cleaningRecordId, createdAt, id)` support efficient cursor queries.
+- **Equipment, cleaning records, and audit entries** all use **keyset (cursor) pagination** sorted by date + id.
+- Composite indexes on `(createdAt, id)`, `(equipmentId, cleanedAt, id)`, and `(cleaningRecordId, createdAt, id)` support efficient cursor queries.
 
 ### Audit trail
 - Every create/update on a cleaning record writes an `AuditEntry` with field-level `{ from, to }` changes (updates) or the full snapshot (creates).
@@ -54,7 +53,6 @@ All seeded users share the same password. The app is at **http://localhost:5173*
 - **Async audit logging** — write audit entries in a background worker instead of blocking the API request.
 - **E2E tests** (Playwright) covering login → create record → edit → view audit log.
 - **Production deployment** — HTTPS, secure cookies, env-based API URL on the frontend (currently hardcoded to `localhost:3001`).
-- **Unified pagination** — migrate equipment list to cursor-based paging for consistency.
 - **Optimistic UI updates** and better error/loading states on the frontend.
 
 ## Deliberately left out

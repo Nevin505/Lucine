@@ -21,8 +21,8 @@ export const updateEquipmentSchema = z
 export const listEquipmentQuerySchema = z.object({
   status: equipmentStatusSchema.optional(),
   name: z.string().trim().max(200).optional(),
-  page: z.coerce.number().int().min(1).optional().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
 export type CreateEquipmentInput = z.infer<typeof createEquipmentSchema>;
