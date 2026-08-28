@@ -8,15 +8,28 @@ export type TableColumn<T> = {
   cellClassName?: string;
 };
 
-export type TablePaginationProps = {
+export type OffsetTablePaginationProps = {
+  mode?: "offset";
   page: number;
   pageSize: number;
   total: number;
   onPageChange: (page: number) => void;
   disabled?: boolean;
-  /** When true, Table slices `rows` locally instead of expecting a server page. */
   clientSide?: boolean;
 };
+
+export type CursorTablePaginationProps = {
+  mode: "cursor";
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  disabled?: boolean;
+};
+
+export type TablePaginationProps =
+  | OffsetTablePaginationProps
+  | CursorTablePaginationProps;
 
 type Props<T> = {
   columns: TableColumn<T>[];
@@ -52,13 +65,13 @@ function SkeletonRows({ columns, count }: { columns: number; count: number }) {
   ));
 }
 
-function TablePaginationFooter({
+function OffsetTablePaginationFooter({
   page,
   pageSize,
   total,
   onPageChange,
   disabled = false,
-}: TablePaginationProps) {
+}: OffsetTablePaginationProps) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (total <= pageSize) {
@@ -94,6 +107,48 @@ function TablePaginationFooter({
   );
 }
 
+function CursorTablePaginationFooter({
+  hasNextPage,
+  hasPreviousPage,
+  onNext,
+  onPrevious,
+  disabled = false,
+}: CursorTablePaginationProps) {
+  if (!hasNextPage && !hasPreviousPage) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+      <Button
+        type="button"
+        variant="secondary"
+        className="px-4 py-2.5 text-sm"
+        disabled={!hasPreviousPage || disabled}
+        onClick={onPrevious}
+      >
+        Previous
+      </Button>
+      <Button
+        type="button"
+        variant="secondary"
+        className="px-4 py-2.5 text-sm"
+        disabled={!hasNextPage || disabled}
+        onClick={onNext}
+      >
+        Next
+      </Button>
+    </div>
+  );
+}
+
+function TablePaginationFooter(props: TablePaginationProps) {
+  if (props.mode === "cursor") {
+    return <CursorTablePaginationFooter {...props} />;
+  }
+  return <OffsetTablePaginationFooter {...props} />;
+}
+
 export function Table<T>({
   columns,
   rows,
@@ -104,11 +159,14 @@ export function Table<T>({
   loading = false,
   pagination,
 }: Props<T>) {
-  const pageSize = pagination?.pageSize ?? 10;
+  const pageSize =
+    pagination?.mode === "cursor"
+      ? 10
+      : (pagination?.pageSize ?? 10);
   const skeletonCount = pageSize;
 
   const displayRows =
-    pagination?.clientSide && pagination
+    pagination && pagination.mode !== "cursor" && pagination.clientSide
       ? rows.slice(
           (pagination.page - 1) * pagination.pageSize,
           pagination.page * pagination.pageSize,

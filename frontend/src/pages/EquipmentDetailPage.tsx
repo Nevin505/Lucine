@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Button, Modal, Table, type TableColumn } from "@/ui";
 import { PageShell } from "@/components/PageShell";
@@ -104,7 +104,8 @@ export function EquipmentDetailPage() {
   const { id = "" } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = parseStatusFilter(searchParams.get("status"));
-  const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
@@ -119,14 +120,19 @@ export function EquipmentDetailPage() {
     refetch: refetchEquipment,
   } = useFetch<EquipmentDetail>(equipmentFetcher);
 
+  useEffect(() => {
+    setCursor(undefined);
+    setCursorStack([]);
+  }, [statusFilter]);
+
   const recordsFetcher = useCallback(
     () =>
       listCleaningRecords(id, {
         ...(statusFilter === "ALL" ? {} : { status: statusFilter }),
-        page,
-        pageSize: PAGE_SIZE,
+        ...(cursor ? { cursor } : {}),
+        limit: PAGE_SIZE,
       }),
-    [id, page, statusFilter],
+    [id, cursor, statusFilter],
   );
 
   const {
@@ -137,7 +143,8 @@ export function EquipmentDetailPage() {
   } = useFetch<CleaningRecordListResponse>(recordsFetcher);
 
   const items = recordsData?.items ?? [];
-  const total = recordsData?.total ?? 0;
+  const hasNextPage = recordsData?.pageInfo.hasNextPage ?? false;
+  const hasPreviousPage = cursorStack.length > 0;
   const canCreate = equipment?.status === "ACTIVE";
   const canEdit = canCreate;
 
@@ -160,11 +167,20 @@ export function EquipmentDetailPage() {
     setSearchParams(params);
   }
 
-  function setPage(nextPage: number) {
-    const params = new URLSearchParams(searchParams);
-    if (nextPage <= 1) params.delete("page");
-    else params.set("page", String(nextPage));
-    setSearchParams(params);
+  function goNext() {
+    const endCursor = recordsData?.pageInfo.endCursor;
+    if (!endCursor) return;
+    setCursorStack((stack) => [...stack, cursor ?? ""]);
+    setCursor(endCursor);
+  }
+
+  function goPrevious() {
+    setCursorStack((stack) => {
+      const next = [...stack];
+      const previous = next.pop();
+      setCursor(previous === "" ? undefined : previous);
+      return next;
+    });
   }
 
   if (equipmentLoading && !equipment) {
@@ -291,10 +307,11 @@ export function EquipmentDetailPage() {
               : "No cleaning records yet."
           }
           pagination={{
-            page,
-            pageSize: PAGE_SIZE,
-            total,
-            onPageChange: setPage,
+            mode: "cursor",
+            hasNextPage,
+            hasPreviousPage,
+            onNext: goNext,
+            onPrevious: goPrevious,
             disabled: recordsLoading,
           }}
         />

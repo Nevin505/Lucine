@@ -22,8 +22,8 @@ export const updateCleaningRecordSchema = z
 
 export const listCleaningRecordsQuerySchema = z.object({
   status: cleaningRecordStatusSchema.optional(),
-  page: z.coerce.number().int().min(1).optional().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
 export type CreateCleaningRecordInput = z.infer<
@@ -37,8 +37,8 @@ export type ListCleaningRecordsQuery = z.infer<
 >;
 
 export const listAuditEntriesQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).optional().default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
+  cursor: z.string().min(1).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
 export type ListAuditEntriesQuery = z.infer<typeof listAuditEntriesQuerySchema>;

@@ -9,8 +9,7 @@ import {
   type FieldChange,
 } from "@/lib/cleaning-records";
 
-const FETCH_PAGE_SIZE = 100;
-const ROW_PAGE_SIZE = 6;
+const PAGE_SIZE = 10;
 
 const TRACKED_FIELDS = ["cleanedAt", "method", "notes", "status"] as const;
 
@@ -125,26 +124,48 @@ export function AuditLogPanel({
   recordMethod,
   onClose,
 }: Props) {
-  const [page, setPage] = useState(1);
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursorStack, setCursorStack] = useState<string[]>([]);
 
   useEffect(() => {
-    setPage(1);
+    setCursor(undefined);
+    setCursorStack([]);
   }, [recordId]);
 
   const fetcher = useCallback(
     () =>
       listAuditEntries(equipmentId, recordId, {
-        page: 1,
-        pageSize: FETCH_PAGE_SIZE,
+        ...(cursor ? { cursor } : {}),
+        limit: PAGE_SIZE,
       }),
-    [equipmentId, recordId],
+    [equipmentId, recordId, cursor],
   );
 
   const { data, loading, error } = useFetch(fetcher);
 
-  const items = data?.items ?? [];
+  const rows = useMemo(
+    () => (data?.items ?? []).flatMap(flattenEntry),
+    [data?.items],
+  );
 
-  const allRows = useMemo(() => items.flatMap(flattenEntry), [items]);
+  const hasNextPage = data?.pageInfo.hasNextPage ?? false;
+  const hasPreviousPage = cursorStack.length > 0;
+
+  function goNext() {
+    const endCursor = data?.pageInfo.endCursor;
+    if (!endCursor) return;
+    setCursorStack((stack) => [...stack, cursor ?? ""]);
+    setCursor(endCursor);
+  }
+
+  function goPrevious() {
+    setCursorStack((stack) => {
+      const next = [...stack];
+      const previous = next.pop();
+      setCursor(previous === "" ? undefined : previous);
+      return next;
+    });
+  }
 
   return (
     <div className="grid gap-4">
@@ -163,25 +184,22 @@ export function AuditLogPanel({
 
       {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
 
-      {loading ? (
-        <p className="text-[#0c1a1f]/60">Loading history…</p>
-      ) : (
-        <Table
-          columns={auditColumns}
-          rows={allRows}
-          getRowKey={(row) => row.id}
-          emptyMessage="No audit entries yet."
-          scrollable
-          pagination={{
-            page,
-            pageSize: ROW_PAGE_SIZE,
-            total: allRows.length,
-            onPageChange: setPage,
-            disabled: loading,
-            clientSide: true,
-          }}
-        />
-      )}
+      <Table
+        columns={auditColumns}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        loading={loading}
+        emptyMessage="No audit entries yet."
+        scrollable
+        pagination={{
+          mode: "cursor",
+          hasNextPage,
+          hasPreviousPage,
+          onNext: goNext,
+          onPrevious: goPrevious,
+          disabled: loading,
+        }}
+      />
 
       <div className="mt-1">
         <Button type="button" variant="secondary" onClick={onClose}>

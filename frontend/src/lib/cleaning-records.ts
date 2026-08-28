@@ -45,15 +45,16 @@ export type CleaningRecord = {
 
 export type CleaningRecordListResponse = {
   items: CleaningRecord[];
-  page: number;
-  pageSize: number;
-  total: number;
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 };
 
 export type ListCleaningRecordsParams = {
   status?: CleaningRecordStatus;
-  page?: number;
-  pageSize?: number;
+  cursor?: string;
+  limit?: number;
 };
 
 export type AuditAction = "CREATE" | "UPDATE";
@@ -72,14 +73,15 @@ export type AuditEntry = {
 
 export type AuditEntryListResponse = {
   items: AuditEntry[];
-  page: number;
-  pageSize: number;
-  total: number;
+  pageInfo: {
+    hasNextPage: boolean;
+    endCursor: string | null;
+  };
 };
 
 export type ListAuditEntriesParams = {
-  page?: number;
-  pageSize?: number;
+  cursor?: string;
+  limit?: number;
 };
 
 type ApiErrorBody = {

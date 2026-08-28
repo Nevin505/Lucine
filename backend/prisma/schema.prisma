@@ -75,6 +75,7 @@ model CleaningRecord {
   auditEntries AuditEntry[]
 
   @@index([equipmentId])
+  @@index([equipmentId, cleanedAt, id])
   @@index([cleanedById])
   @@map("cleaning_records")
 }
@@ -92,6 +93,7 @@ model AuditEntry {
   user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([cleaningRecordId])
+  @@index([cleaningRecordId, createdAt, id])
   @@index([userId])
   @@map("audit_entries")
 }

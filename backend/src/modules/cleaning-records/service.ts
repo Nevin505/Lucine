@@ -1,4 +1,10 @@
 import { Prisma } from "../../generated/prisma/client";
+import {
+  encodeCursor,
+  parseCursor,
+  rowsAfter,
+  toPage,
+} from "../../lib/pagination";
 import { prisma } from "../../lib/prisma";
 import type { AuthUser } from "../../types/express";
 import { buildAuditChanges } from "./audit-changes";
@@ -11,6 +17,7 @@ import type {
 
 const equipmentNotFound = { error: "Equipment not found" as const };
 const recordNotFound = { error: "Cleaning record not found" as const };
+const invalidCursor = { error: "Invalid cursor" as const };
 const retiredModifyError = {
   error: "Cannot modify cleaning records for retired equipment" as const,
 };
@@ -35,31 +42,29 @@ export async function listCleaningRecords(
     return { ok: false as const, status: 404 as const, body: equipmentNotFound };
   }
 
-  const where = {
-    equipmentId,
-    ...(query.status ? { status: query.status } : {}),
-  };
-  const skip = (query.page - 1) * query.pageSize;
+  const cursor = query.cursor ? parseCursor(query.cursor) : null;
+  if (query.cursor && !cursor) {
+    return { ok: false as const, status: 400 as const, body: invalidCursor };
+  }
 
-  const [items, total] = await Promise.all([
-    prisma.cleaningRecord.findMany({
-      where,
-      orderBy: { cleanedAt: "desc" },
-      skip,
-      take: query.pageSize,
-    }),
-    prisma.cleaningRecord.count({ where }),
-  ]);
+  const rows = await prisma.cleaningRecord.findMany({
+    where: {
+      equipmentId,
+      ...(query.status ? { status: query.status } : {}),
+      ...(cursor ? rowsAfter("cleanedAt", cursor) : {}),
+    },
+    orderBy: [{ cleanedAt: "desc" }, { id: "desc" }],
+    take: query.limit + 1,
+  });
+
+  const { items, pageInfo } = toPage(rows, query.limit, (row) =>
+    encodeCursor(row.cleanedAt, row.id),
+  );
 
   return {
     ok: true as const,
     status: 200 as const,
-    body: {
-      items,
-      page: query.page,
-      pageSize: query.pageSize,
-      total,
-    },
+    body: { items, pageInfo },
   };
 }
 
@@ -170,26 +175,27 @@ export async function listAuditEntries(
     return { ok: false as const, status: 404 as const, body: recordNotFound };
   }
 
-  const skip = (query.page - 1) * query.pageSize;
+  const cursor = query.cursor ? parseCursor(query.cursor) : null;
+  if (query.cursor && !cursor) {
+    return { ok: false as const, status: 400 as const, body: invalidCursor };
+  }
 
-  const [items, total] = await Promise.all([
-    prisma.auditEntry.findMany({
-      where: { cleaningRecordId: recordId },
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: query.pageSize,
-    }),
-    prisma.auditEntry.count({ where: { cleaningRecordId: recordId } }),
-  ]);
+  const rows = await prisma.auditEntry.findMany({
+    where: {
+      cleaningRecordId: recordId,
+      ...(cursor ? rowsAfter("createdAt", cursor) : {}),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: query.limit + 1,
+  });
+
+  const { items, pageInfo } = toPage(rows, query.limit, (row) =>
+    encodeCursor(row.createdAt, row.id),
+  );
 
   return {
     ok: true as const,
     status: 200 as const,
-    body: {
-      items,
-      page: query.page,
-      pageSize: query.pageSize,
-      total,
-    },
+    body: { items, pageInfo },
   };
 }

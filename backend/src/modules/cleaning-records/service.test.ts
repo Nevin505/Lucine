@@ -1,26 +1,23 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { encodeCursor } from "../../lib/pagination";
 
 const {
   equipmentFindUnique,
   cleaningRecordFindMany,
-  cleaningRecordCount,
   cleaningRecordFindFirst,
   txCreate,
   txUpdate,
   auditCreate,
   auditFindMany,
-  auditCount,
   transaction,
 } = vi.hoisted(() => ({
   equipmentFindUnique: vi.fn(),
   cleaningRecordFindMany: vi.fn(),
-  cleaningRecordCount: vi.fn(),
   cleaningRecordFindFirst: vi.fn(),
   txCreate: vi.fn(),
   txUpdate: vi.fn(),
   auditCreate: vi.fn(),
   auditFindMany: vi.fn(),
-  auditCount: vi.fn(),
   transaction: vi.fn(),
 }));
 
@@ -29,12 +26,10 @@ vi.mock("../../lib/prisma", () => ({
     equipment: { findUnique: equipmentFindUnique },
     cleaningRecord: {
       findMany: cleaningRecordFindMany,
-      count: cleaningRecordCount,
       findFirst: cleaningRecordFindFirst,
     },
     auditEntry: {
       findMany: auditFindMany,
-      count: auditCount,
     },
     $transaction: transaction,
   },
@@ -49,64 +44,106 @@ import {
 
 const user = { id: "user-1", name: "Alex Operator", role: "OPERATOR" as const };
 
+const cleanedAt = new Date("2026-01-15T10:00:00.000Z");
+
 describe("listCleaningRecords", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     equipmentFindUnique.mockResolvedValue({ id: "eq-1", status: "ACTIVE" });
-    cleaningRecordFindMany.mockResolvedValue([{ id: "rec-2" }]);
-    cleaningRecordCount.mockResolvedValue(25);
+    cleaningRecordFindMany.mockResolvedValue([
+      { id: "rec-2", cleanedAt },
+      { id: "rec-3", cleanedAt },
+    ]);
   });
 
-  it("applies skip and take from page and pageSize", async () => {
-    const result = await listCleaningRecords("eq-1", {
-      page: 3,
-      pageSize: 10,
-    });
+  it("fetches the first page with limit + 1", async () => {
+    const result = await listCleaningRecords("eq-1", { limit: 10 });
 
     expect(cleaningRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        skip: 20,
-        take: 10,
+        where: { equipmentId: "eq-1" },
+        orderBy: [{ cleanedAt: "desc" }, { id: "desc" }],
+        take: 11,
       }),
     );
     expect(result).toMatchObject({
       ok: true,
       status: 200,
       body: {
-        page: 3,
-        pageSize: 10,
-        total: 25,
-        items: [{ id: "rec-2" }],
+        items: [
+          { id: "rec-2", cleanedAt },
+          { id: "rec-3", cleanedAt },
+        ],
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: encodeCursor(cleanedAt, "rec-3"),
+        },
       },
     });
   });
 
+  it("applies a cursor filter when provided", async () => {
+    const cursor = encodeCursor(cleanedAt, "rec-2");
+
+    await listCleaningRecords("eq-1", { limit: 10, cursor });
+
+    expect(cleaningRecordFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          equipmentId: "eq-1",
+          OR: expect.any(Array),
+        }),
+        take: 11,
+      }),
+    );
+  });
+
+  it("returns hasNextPage when an extra row is fetched", async () => {
+    cleaningRecordFindMany.mockResolvedValue(
+      Array.from({ length: 4 }, (_, i) => ({
+        id: `rec-${i}`,
+        cleanedAt,
+      })),
+    );
+
+    const result = await listCleaningRecords("eq-1", { limit: 3 });
+
+    expect(result.body.items).toHaveLength(3);
+    expect(result.body.pageInfo.hasNextPage).toBe(true);
+  });
+
   it("filters by status when provided", async () => {
     await listCleaningRecords("eq-1", {
-      page: 1,
-      pageSize: 20,
+      limit: 20,
       status: "VERIFIED",
     });
 
     expect(cleaningRecordFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { equipmentId: "eq-1", status: "VERIFIED" },
-        skip: 0,
-        take: 20,
+        take: 21,
       }),
     );
-    expect(cleaningRecordCount).toHaveBeenCalledWith({
-      where: { equipmentId: "eq-1", status: "VERIFIED" },
+  });
+
+  it("returns 400 for an invalid cursor", async () => {
+    const result = await listCleaningRecords("eq-1", {
+      limit: 10,
+      cursor: "not-a-cursor",
     });
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      body: { error: "Invalid cursor" },
+    });
+    expect(cleaningRecordFindMany).not.toHaveBeenCalled();
   });
 
   it("returns 404 when equipment does not exist", async () => {
     equipmentFindUnique.mockResolvedValue(null);
 
-    const result = await listCleaningRecords("missing", {
-      page: 1,
-      pageSize: 20,
-    });
+    const result = await listCleaningRecords("missing", { limit: 20 });
 
     expect(result).toEqual({
       ok: false,
@@ -275,34 +312,35 @@ describe("updateCleaningRecord", () => {
 });
 
 describe("listAuditEntries", () => {
+  const createdAt = new Date("2026-01-16T08:00:00.000Z");
+
   beforeEach(() => {
     vi.clearAllMocks();
     cleaningRecordFindFirst.mockResolvedValue({ id: "rec-1" });
-    auditFindMany.mockResolvedValue([{ id: "audit-1", action: "CREATE" }]);
-    auditCount.mockResolvedValue(1);
+    auditFindMany.mockResolvedValue([
+      { id: "audit-1", action: "CREATE", createdAt },
+    ]);
   });
 
-  it("returns paginated audit entries for a record", async () => {
-    const result = await listAuditEntries("eq-1", "rec-1", {
-      page: 2,
-      pageSize: 5,
-    });
+  it("returns cursor-paginated audit entries", async () => {
+    const result = await listAuditEntries("eq-1", "rec-1", { limit: 5 });
 
     expect(auditFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { cleaningRecordId: "rec-1" },
-        skip: 5,
-        take: 5,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 6,
       }),
     );
     expect(result).toMatchObject({
       ok: true,
       status: 200,
       body: {
-        page: 2,
-        pageSize: 5,
-        total: 1,
         items: [{ id: "audit-1", action: "CREATE" }],
+        pageInfo: {
+          hasNextPage: false,
+          endCursor: encodeCursor(createdAt, "audit-1"),
+        },
       },
     });
   });
@@ -310,10 +348,7 @@ describe("listAuditEntries", () => {
   it("returns 404 when the record does not exist", async () => {
     cleaningRecordFindFirst.mockResolvedValue(null);
 
-    const result = await listAuditEntries("eq-1", "missing", {
-      page: 1,
-      pageSize: 20,
-    });
+    const result = await listAuditEntries("eq-1", "missing", { limit: 20 });
 
     expect(result).toEqual({
       ok: false,
