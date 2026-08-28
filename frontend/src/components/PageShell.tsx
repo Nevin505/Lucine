@@ -21,7 +21,7 @@ export function PageShell({
   return (
     <div className="min-h-screen bg-[#0d242b]">
       <div className="mx-auto grid min-h-screen w-full content-start gap-6 px-5 py-8">
-        <header className="flex flex-wrap items-end justify-between gap-4 text-[#e8f2f0] animate-[rise_700ms_ease_both]">
+        <header className="flex flex-wrap items-end justify-between gap-4 text-[#e8f2f0]">
           <div className="grid gap-2">
             <Link
               to={user ? "/equipment" : "/login"}

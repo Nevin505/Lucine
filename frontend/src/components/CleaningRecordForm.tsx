@@ -13,7 +13,9 @@ type Props = {
   record?: CleaningRecord | null;
   onCancel: () => void;
   onSaved: (record: CleaningRecord) => void;
+  onViewHistory?: () => void;
   allowCreate?: boolean;
+  allowEdit?: boolean;
 };
 
 function toLocalInputValue(iso: string) {
@@ -32,7 +34,9 @@ export function CleaningRecordForm({
   record,
   onCancel,
   onSaved,
+  onViewHistory,
   allowCreate = true,
+  allowEdit = true,
 }: Props) {
   const isEdit = Boolean(record);
   const [cleanedAt, setCleanedAt] = useState(
@@ -73,6 +77,10 @@ export function CleaningRecordForm({
     setPending(true);
     try {
       if (isEdit && record) {
+        if (!allowEdit) {
+          setFormError("Cannot update cleaning records for retired equipment");
+          return;
+        }
         const saved = await updateCleaningRecord(
           equipmentId,
           record.id,
@@ -167,10 +175,16 @@ export function CleaningRecordForm({
         </select>
       </div>
 
-      {isEdit && record ? (
-        <p className="text-sm text-[#0c1a1f]/55">
-          Cleaned by {record.cleanedByName}
-        </p>
+      {isEdit && onViewHistory ? (
+        <div className="text-sm">
+          <button
+            type="button"
+            className="font-semibold text-[#1f7a6c] underline-offset-2 hover:underline"
+            onClick={onViewHistory}
+          >
+            View change history
+          </button>
+        </div>
       ) : null}
 
       {formError ? (

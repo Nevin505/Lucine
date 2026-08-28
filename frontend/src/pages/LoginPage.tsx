@@ -19,7 +19,7 @@ export function LoginPage() {
       <div className="min-h-screen bg-[#0d242b]">
         <div className="grid min-h-screen place-items-center px-5 py-8">
           <div className="grid w-full max-w-[960px] grid-cols-1 items-stretch gap-5 lg:grid-cols-[1.1fr_0.9fr] lg:gap-8">
-            <header className="flex flex-col justify-center px-0.5 py-6 text-[#e8f2f0] animate-[rise_700ms_ease_both] max-lg:pt-1">
+            <header className="flex flex-col justify-center px-0.5 py-6 text-[#e8f2f0] max-lg:pt-1">
               <p className="mb-5 font-serif text-[clamp(2.6rem,14vw,5.5rem)] leading-[0.9] font-semibold tracking-[-0.04em] lg:text-[clamp(3rem,8vw,5.5rem)]">
                 Leucine
               </p>

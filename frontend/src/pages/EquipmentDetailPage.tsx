@@ -1,8 +1,9 @@
 import { useCallback, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { Button, Modal } from "@/ui";
+import { Button, Modal, Table, type TableColumn } from "@/ui";
 import { PageShell } from "@/components/PageShell";
 import { CleaningRecordForm } from "@/components/CleaningRecordForm";
+import { AuditLogPanel } from "@/components/AuditLogPanel";
 import { useFetch } from "@/hooks/useFetch";
 import { getEquipment, type EquipmentDetail } from "@/lib/equipment";
 import {
@@ -17,6 +18,7 @@ const PAGE_SIZE = 10;
 type ModalState =
   | { mode: "create" }
   | { mode: "edit"; record: CleaningRecord }
+  | { mode: "history"; record: CleaningRecord }
   | null;
 
 function statusLabel(status: CleaningRecordStatus) {
@@ -34,6 +36,68 @@ function formatCleanedAt(iso: string) {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
   return date.toLocaleString();
+}
+
+function cleaningRecordColumns(
+  canEdit: boolean,
+  onHistory: (record: CleaningRecord) => void,
+  onEdit: (record: CleaningRecord) => void,
+): TableColumn<CleaningRecord>[] {
+  return [
+    {
+      header: "Procedure",
+      cell: (item) => (
+        <span className="font-semibold text-[#0c1a1f]">{item.method}</span>
+      ),
+    },
+    {
+      header: "Date & time",
+      cell: (item) => formatCleanedAt(item.cleanedAt),
+    },
+    {
+      header: "Operator",
+      cell: (item) => item.cleanedByName,
+    },
+    {
+      header: "Status",
+      cell: (item) => statusLabel(item.status),
+    },
+    {
+      header: "Notes",
+      cell: (item) =>
+        item.notes ? (
+          <span className="text-[#0c1a1f]/55">{item.notes}</span>
+        ) : (
+          <span className="text-[#0c1a1f]/30">—</span>
+        ),
+    },
+    {
+      header: "Actions",
+      headerClassName: "text-right",
+      cellClassName: "text-right",
+      cell: (item) => (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="px-4 py-2.5 text-sm"
+            onClick={() => onHistory(item)}
+          >
+            History
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="px-4 py-2.5 text-sm"
+            disabled={!canEdit}
+            onClick={() => onEdit(item)}
+          >
+            Edit
+          </Button>
+        </div>
+      ),
+    },
+  ];
 }
 
 export function EquipmentDetailPage() {
@@ -74,8 +138,20 @@ export function EquipmentDetailPage() {
 
   const items = recordsData?.items ?? [];
   const total = recordsData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const canCreate = equipment?.status === "ACTIVE";
+  const canEdit = canCreate;
+
+  const columns = cleaningRecordColumns(
+    canEdit,
+    (record) => {
+      setActionError(null);
+      setModal({ mode: "history", record });
+    },
+    (record) => {
+      setActionError(null);
+      setModal({ mode: "edit", record });
+    },
+  );
 
   function setFilter(next: CleaningRecordStatus | "ALL") {
     setActionError(null);
@@ -129,7 +205,7 @@ export function EquipmentDetailPage() {
     <PageShell
       wide
       title={equipment.name}
-      description="Create, update, and review cleaning records for this equipment."
+      description="Create, update, and review cleaning records. Use History on each record to view its audit log."
     >
       <section className="grid gap-5">
         <div className="flex flex-wrap items-end justify-between gap-3">
@@ -166,9 +242,8 @@ export function EquipmentDetailPage() {
         </div>
 
         {!canCreate ? (
-          <p className="text-sm text-[#0c1a1f]/55">
-            This equipment is retired. Existing records can be edited, but new
-            ones cannot be created.
+          <p className="text-sm text-[#b42318]">
+            This equipment is retired. Records cannot be created or edited.
           </p>
         ) : null}
 
@@ -205,82 +280,41 @@ export function EquipmentDetailPage() {
           <p className="text-sm text-[#b42318]">{actionError}</p>
         ) : null}
 
-        {recordsLoading ? (
-          <p className="text-[#0c1a1f]/60">Loading records…</p>
-        ) : items.length === 0 ? (
-          <p className="text-[#0c1a1f]/60">
-            No cleaning records yet.
-            {canCreate ? " Add one to get started." : ""}
-          </p>
-        ) : (
-          <ul className="grid gap-0 divide-y divide-[#0c1a1f]/12 border-y border-[#0c1a1f]/12">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-4"
-              >
-                <div className="grid min-w-0 gap-1">
-                  <p className="truncate font-semibold text-[#0c1a1f]">
-                    {item.method}
-                  </p>
-                  <p className="text-sm text-[#0c1a1f]/55">
-                    {formatCleanedAt(item.cleanedAt)}
-                    <span className="mx-2 text-[#0c1a1f]/25">·</span>
-                    {item.cleanedByName}
-                    <span className="mx-2 text-[#0c1a1f]/25">·</span>
-                    {statusLabel(item.status)}
-                  </p>
-                  {item.notes ? (
-                    <p className="text-sm text-[#0c1a1f]/45">{item.notes}</p>
-                  ) : null}
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  className="px-4 py-2.5 text-sm"
-                  onClick={() => {
-                    setActionError(null);
-                    setModal({ mode: "edit", record: item });
-                  }}
-                >
-                  Edit
-                </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {total > PAGE_SIZE ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-[#0c1a1f]/55">
-              Page {page} of {totalPages} · {total} total
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-4 py-2.5 text-sm"
-                disabled={page <= 1 || recordsLoading}
-                onClick={() => setPage(Math.max(1, page - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-4 py-2.5 text-sm"
-                disabled={page >= totalPages || recordsLoading}
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <Table
+          columns={columns}
+          rows={items}
+          getRowKey={(item) => item.id}
+          loading={recordsLoading}
+          emptyMessage={
+            canCreate
+              ? "No cleaning records yet. Add one to get started — each record keeps an audit log of changes."
+              : "No cleaning records yet."
+          }
+          pagination={{
+            page,
+            pageSize: PAGE_SIZE,
+            total,
+            onPageChange: setPage,
+            disabled: recordsLoading,
+          }}
+        />
       </section>
 
-      <Modal open={modal !== null} onClose={closeModal}>
-        {modal ? (
+      <Modal
+        open={modal !== null}
+        onClose={closeModal}
+        wide={modal?.mode === "history"}
+        labelledBy={modal?.mode === "history" ? "audit-log-title" : undefined}
+      >
+        {modal?.mode === "history" ? (
+          <AuditLogPanel
+            key={modal.record.id}
+            equipmentId={id}
+            recordId={modal.record.id}
+            recordMethod={modal.record.method}
+            onClose={closeModal}
+          />
+        ) : modal ? (
           <CleaningRecordForm
             key={
               modal.mode === "edit" ? modal.record.id : "create-cleaning-record"
@@ -288,6 +322,13 @@ export function EquipmentDetailPage() {
             equipmentId={id}
             record={modal.mode === "edit" ? modal.record : null}
             allowCreate={canCreate}
+            allowEdit={canEdit}
+            onViewHistory={
+              modal.mode === "edit"
+                ? () =>
+                    setModal({ mode: "history", record: modal.record })
+                : undefined
+            }
             onCancel={closeModal}
             onSaved={() => {
               closeModal();

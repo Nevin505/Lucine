@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Modal } from "@/ui";
+import { Button, Modal, Table, type TableColumn } from "@/ui";
 import { PageShell } from "@/components/PageShell";
 import { EquipmentForm } from "@/components/EquipmentForm";
 import { useFetch } from "@/hooks/useFetch";
@@ -26,6 +26,73 @@ function statusLabel(status: EquipmentStatus) {
 function parseStatusFilter(value: string | null): EquipmentStatus | "ALL" {
   if (value === "ACTIVE" || value === "RETIRED") return value;
   return "ALL";
+}
+
+function equipmentColumns(
+  navigate: ReturnType<typeof useNavigate>,
+  deletingId: string | null,
+  onEdit: (equipment: Equipment) => void,
+  onDelete: (equipment: Equipment) => void,
+): TableColumn<Equipment>[] {
+  return [
+    {
+      header: "Name",
+      cell: (item) => (
+        <Link
+          to={`/equipment/${item.id}`}
+          className="font-semibold text-[#0c1a1f] underline-offset-2 hover:underline"
+        >
+          {item.name}
+        </Link>
+      ),
+    },
+    {
+      header: "ID",
+      cell: (item) => (
+        <code className="rounded-md bg-[#1f7a6c]/10 px-1.5 py-0.5 text-[0.78rem]">
+          {item.code}
+        </code>
+      ),
+    },
+    {
+      header: "Status",
+      cell: (item) => statusLabel(item.status),
+    },
+    {
+      header: "Actions",
+      headerClassName: "text-right",
+      cellClassName: "text-right",
+      cell: (item) => (
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            className="px-4 py-2.5 text-sm"
+            onClick={() => navigate(`/equipment/${item.id}`)}
+          >
+            Cleaning records
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="px-4 py-2.5 text-sm"
+            onClick={() => onEdit(item)}
+          >
+            Edit
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            className="px-4 py-2.5 text-sm"
+            disabled={deletingId === item.id}
+            onClick={() => void onDelete(item)}
+          >
+            {deletingId === item.id ? "Deleting…" : "Delete"}
+          </Button>
+        </div>
+      ),
+    },
+  ];
 }
 
 export function EquipmentListPage() {
@@ -55,7 +122,6 @@ export function EquipmentListPage() {
 
   const items = data?.items ?? [];
   const total = data?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   function setFilter(next: EquipmentStatus | "ALL") {
     setActionError(null);
@@ -91,6 +157,16 @@ export function EquipmentListPage() {
       setDeletingId(null);
     }
   }
+
+  const columns = equipmentColumns(
+    navigate,
+    deletingId,
+    (equipment) => {
+      setActionError(null);
+      setModal({ mode: "edit", equipment });
+    },
+    handleDelete,
+  );
 
   return (
     <PageShell
@@ -144,96 +220,20 @@ export function EquipmentListPage() {
           <p className="text-sm text-[#b42318]">{actionError}</p>
         ) : null}
 
-        {loading ? (
-          <p className="text-[#0c1a1f]/60">Loading equipment…</p>
-        ) : items.length === 0 ? (
-          <p className="text-[#0c1a1f]/60">
-            No equipment found. Add one to get started.
-          </p>
-        ) : (
-          <ul className="grid gap-0 divide-y divide-[#0c1a1f]/12 border-y border-[#0c1a1f]/12">
-            {items.map((item) => (
-              <li
-                key={item.id}
-                className="flex flex-wrap items-center justify-between gap-3 py-4"
-              >
-                <div className="grid min-w-0 gap-1">
-                  <Link
-                    to={`/equipment/${item.id}`}
-                    className="truncate font-semibold text-[#0c1a1f] underline-offset-2 hover:underline"
-                  >
-                    {item.name}
-                  </Link>
-                  <p className="text-sm text-[#0c1a1f]/55">
-                    <code className="rounded-md bg-[#1f7a6c]/10 px-1.5 py-0.5 text-[0.78rem]">
-                      {item.code}
-                    </code>
-                    <span className="mx-2 text-[#0c1a1f]/25">·</span>
-                    {statusLabel(item.status)}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="px-4 py-2.5 text-sm"
-                    onClick={() => navigate(`/equipment/${item.id}`)}
-                  >
-                    Records
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="px-4 py-2.5 text-sm"
-                    onClick={() => {
-                      setActionError(null);
-                      setModal({ mode: "edit", equipment: item });
-                    }}
-                  >
-                    Edit
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="px-4 py-2.5 text-sm"
-                    disabled={deletingId === item.id}
-                    onClick={() => void handleDelete(item)}
-                  >
-                    {deletingId === item.id ? "Deleting…" : "Delete"}
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {total > PAGE_SIZE ? (
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-[#0c1a1f]/55">
-              Page {page} of {totalPages} · {total} total
-            </p>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-4 py-2.5 text-sm"
-                disabled={page <= 1 || loading}
-                onClick={() => setPage(Math.max(1, page - 1))}
-              >
-                Previous
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                className="px-4 py-2.5 text-sm"
-                disabled={page >= totalPages || loading}
-                onClick={() => setPage(Math.min(totalPages, page + 1))}
-              >
-                Next
-              </Button>
-            </div>
-          </div>
-        ) : null}
+        <Table
+          columns={columns}
+          rows={items}
+          getRowKey={(item) => item.id}
+          loading={loading}
+          emptyMessage="No equipment found. Add one to get started."
+          pagination={{
+            page,
+            pageSize: PAGE_SIZE,
+            total,
+            onPageChange: setPage,
+            disabled: loading,
+          }}
+        />
       </section>
 
       <Modal open={modal !== null} onClose={closeModal}>

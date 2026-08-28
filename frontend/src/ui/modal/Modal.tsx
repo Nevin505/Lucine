@@ -5,10 +5,9 @@ type Props = {
   onClose: () => void;
   children: ReactNode;
   labelledBy?: string;
-  wide?: boolean;
 };
 
-export function Modal({ open, onClose, children, labelledBy, wide }: Props) {
+export function Modal({ open, onClose, children, labelledBy }: Props) {
   useEffect(() => {
     if (!open) return;
 
@@ -40,7 +39,7 @@ export function Modal({ open, onClose, children, labelledBy, wide }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
-        className={`relative z-10 w-full rounded-[18px] border border-white/35 bg-[#e8f2f0] p-7 shadow-[0_24px_60px_rgba(8,20,24,0.4)] ${wide ? "max-w-[760px]" : "max-w-[440px]"}`}
+        className="relative z-10 w-full max-w-[440px] rounded-[18px] border border-white/35 bg-[#e8f2f0] p-7 shadow-[0_24px_60px_rgba(8,20,24,0.4)]"
       >
         {children}
       </div>

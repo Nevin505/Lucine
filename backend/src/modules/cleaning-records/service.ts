@@ -1,16 +1,18 @@
 import { Prisma } from "../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
 import type { AuthUser } from "../../types/express";
+import { buildAuditChanges } from "./audit-changes";
 import type {
   CreateCleaningRecordInput,
+  ListAuditEntriesQuery,
   ListCleaningRecordsQuery,
   UpdateCleaningRecordInput,
 } from "./schemas";
 
 const equipmentNotFound = { error: "Equipment not found" as const };
 const recordNotFound = { error: "Cleaning record not found" as const };
-const retiredError = {
-  error: "Cannot create cleaning records for retired equipment" as const,
+const retiredModifyError = {
+  error: "Cannot modify cleaning records for retired equipment" as const,
 };
 
 function toJsonValue(value: unknown): Prisma.InputJsonValue {
@@ -71,7 +73,7 @@ export async function createCleaningRecord(
     return { ok: false as const, status: 404 as const, body: equipmentNotFound };
   }
   if (equipment.status === "RETIRED") {
-    return { ok: false as const, status: 409 as const, body: retiredError };
+    return { ok: false as const, status: 409 as const, body: retiredModifyError };
   }
 
   const record = await prisma.$transaction(async (tx) => {
@@ -109,6 +111,14 @@ export async function updateCleaningRecord(
   input: UpdateCleaningRecordInput,
   user: AuthUser,
 ) {
+  const equipment = await assertEquipmentExists(equipmentId);
+  if (!equipment) {
+    return { ok: false as const, status: 404 as const, body: equipmentNotFound };
+  }
+  if (equipment.status === "RETIRED") {
+    return { ok: false as const, status: 409 as const, body: retiredModifyError };
+  }
+
   const existing = await prisma.cleaningRecord.findFirst({
     where: { id, equipmentId },
   });
@@ -117,20 +127,7 @@ export async function updateCleaningRecord(
     return { ok: false as const, status: 404 as const, body: recordNotFound };
   }
 
-  const changes: Record<string, { from: unknown; to: unknown }> = {};
-
-  if (input.cleanedAt !== undefined) {
-    changes.cleanedAt = { from: existing.cleanedAt, to: input.cleanedAt };
-  }
-  if (input.method !== undefined) {
-    changes.method = { from: existing.method, to: input.method };
-  }
-  if (input.notes !== undefined) {
-    changes.notes = { from: existing.notes, to: input.notes };
-  }
-  if (input.status !== undefined) {
-    changes.status = { from: existing.status, to: input.status };
-  }
+  const changes = buildAuditChanges(existing, input);
 
   const record = await prisma.$transaction(async (tx) => {
     const updated = await tx.cleaningRecord.update({
@@ -157,4 +154,42 @@ export async function updateCleaningRecord(
   });
 
   return { ok: true as const, status: 200 as const, body: record };
+}
+
+export async function listAuditEntries(
+  equipmentId: string,
+  recordId: string,
+  query: ListAuditEntriesQuery,
+) {
+  const record = await prisma.cleaningRecord.findFirst({
+    where: { id: recordId, equipmentId },
+    select: { id: true },
+  });
+
+  if (!record) {
+    return { ok: false as const, status: 404 as const, body: recordNotFound };
+  }
+
+  const skip = (query.page - 1) * query.pageSize;
+
+  const [items, total] = await Promise.all([
+    prisma.auditEntry.findMany({
+      where: { cleaningRecordId: recordId },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: query.pageSize,
+    }),
+    prisma.auditEntry.count({ where: { cleaningRecordId: recordId } }),
+  ]);
+
+  return {
+    ok: true as const,
+    status: 200 as const,
+    body: {
+      items,
+      page: query.page,
+      pageSize: query.pageSize,
+      total,
+    },
+  };
 }

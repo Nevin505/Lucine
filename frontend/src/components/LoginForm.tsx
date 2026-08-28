@@ -71,17 +71,6 @@ export function LoginForm({ onSuccess }: Props) {
       <Button type="submit" disabled={pending} className="mt-1">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
-
-      <p className="mt-1 text-[0.82rem] leading-snug text-[#0c1a1f]/55">
-        Demo:{" "}
-        <code className="rounded-md bg-[#1f7a6c]/10 px-1.5 py-0.5 text-[0.78rem]">
-          operator@example.com
-        </code>{" "}
-        /{" "}
-        <code className="rounded-md bg-[#1f7a6c]/10 px-1.5 py-0.5 text-[0.78rem]">
-          password123
-        </code>
-      </p>
     </form>
   );
 }

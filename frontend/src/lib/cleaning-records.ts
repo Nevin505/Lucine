@@ -56,6 +56,32 @@ export type ListCleaningRecordsParams = {
   pageSize?: number;
 };
 
+export type AuditAction = "CREATE" | "UPDATE";
+
+export type FieldChange = { from: unknown; to: unknown };
+
+export type AuditEntry = {
+  id: string;
+  cleaningRecordId: string;
+  userId: string | null;
+  userName: string;
+  action: AuditAction;
+  changes: Record<string, FieldChange> | CleaningRecord;
+  createdAt: string;
+};
+
+export type AuditEntryListResponse = {
+  items: AuditEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export type ListAuditEntriesParams = {
+  page?: number;
+  pageSize?: number;
+};
+
 type ApiErrorBody = {
   error?: string;
   details?: Array<{ field: string; message: string }>;
@@ -117,6 +143,22 @@ export async function updateCleaningRecord(
     const { data } = await api.patch<CleaningRecord>(
       `/equipment/${equipmentId}/cleaning-records/${id}`,
       input,
+    );
+    return data;
+  } catch (error) {
+    throw new Error(parseApiError(error), { cause: error });
+  }
+}
+
+export async function listAuditEntries(
+  equipmentId: string,
+  recordId: string,
+  params: ListAuditEntriesParams = {},
+): Promise<AuditEntryListResponse> {
+  try {
+    const { data } = await api.get<AuditEntryListResponse>(
+      `/equipment/${equipmentId}/cleaning-records/${recordId}/audit-entries`,
+      { params },
     );
     return data;
   } catch (error) {

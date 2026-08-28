@@ -3,11 +3,13 @@ import { requireAuth } from "../../middleware/auth";
 import { validateBody } from "../../middleware/validate";
 import {
   createCleaningRecordSchema,
+  listAuditEntriesQuerySchema,
   listCleaningRecordsQuerySchema,
   updateCleaningRecordSchema,
 } from "./schemas";
 import {
   createCleaningRecord,
+  listAuditEntries,
   listCleaningRecords,
   updateCleaningRecord,
 } from "./service";
@@ -61,6 +63,34 @@ router.post("/", validateBody(createCleaningRecordSchema), async (req, res) => {
     return res.status(result.status).json(result.body);
   } catch (err) {
     console.error("POST /equipment/:equipmentId/cleaning-records failed:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+router.get("/:id/audit-entries", async (req, res) => {
+  try {
+    const parsed = listAuditEntriesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Validation failed",
+        details: parsed.error.issues.map((issue) => ({
+          field: issue.path.join(".") || "query",
+          message: issue.message,
+        })),
+      });
+    }
+
+    const result = await listAuditEntries(
+      equipmentIdFrom(req),
+      paramId(req.params.id),
+      parsed.data,
+    );
+    return res.status(result.status).json(result.body);
+  } catch (err) {
+    console.error(
+      "GET /equipment/:equipmentId/cleaning-records/:id/audit-entries failed:",
+      err,
+    );
     return res.status(500).json({ error: "Internal server error" });
   }
 });
