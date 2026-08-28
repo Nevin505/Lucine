@@ -1,6 +1,6 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Button, Modal, Table, type TableColumn } from "@/ui";
+import { Button, Input, Modal, Table, type TableColumn } from "@/ui";
 import { PageShell } from "@/components/PageShell";
 import { EquipmentForm } from "@/components/EquipmentForm";
 import { useFetch } from "@/hooks/useFetch";
@@ -99,11 +99,32 @@ export function EquipmentListPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = parseStatusFilter(searchParams.get("status"));
+  const nameFilter = searchParams.get("name")?.trim() ?? "";
   const page = Math.max(1, Number(searchParams.get("page") || "1") || 1);
 
+  const [nameInput, setNameInput] = useState(nameFilter);
   const [actionError, setActionError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [modal, setModal] = useState<ModalState>(null);
+
+  useEffect(() => {
+    setNameInput(nameFilter);
+  }, [nameFilter]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const trimmed = nameInput.trim();
+      if (trimmed === nameFilter) return;
+
+      const params = new URLSearchParams(searchParams);
+      if (trimmed) params.set("name", trimmed);
+      else params.delete("name");
+      params.delete("page");
+      setSearchParams(params);
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [nameFilter, nameInput, searchParams, setSearchParams]);
 
   const closeModal = useCallback(() => setModal(null), []);
 
@@ -111,10 +132,11 @@ export function EquipmentListPage() {
     () =>
       listEquipment({
         ...(statusFilter === "ALL" ? {} : { status: statusFilter }),
+        ...(nameFilter ? { name: nameFilter } : {}),
         page,
         pageSize: PAGE_SIZE,
       }),
-    [page, statusFilter],
+    [nameFilter, page, statusFilter],
   );
 
   const { data, loading, error, refetch } =
@@ -125,8 +147,10 @@ export function EquipmentListPage() {
 
   function setFilter(next: EquipmentStatus | "ALL") {
     setActionError(null);
-    const params = new URLSearchParams();
+    const params = new URLSearchParams(searchParams);
     if (next !== "ALL") params.set("status", next);
+    else params.delete("status");
+    params.delete("page");
     setSearchParams(params);
   }
 
@@ -189,30 +213,42 @@ export function EquipmentListPage() {
           </Button>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              ["ALL", "All"],
-              ["ACTIVE", "Active"],
-              ["RETIRED", "Retired"],
-            ] as const
-          ).map(([value, label]) => {
-            const active = statusFilter === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setFilter(value)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                  active
-                    ? "bg-[#1f7a6c] text-white"
-                    : "border border-[#0c1a1f]/12 text-[#1a333c] hover:bg-[#0c1a1f]/5"
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-wrap gap-2">
+            {(
+              [
+                ["ALL", "All"],
+                ["ACTIVE", "Active"],
+                ["RETIRED", "Retired"],
+              ] as const
+            ).map(([value, label]) => {
+              const active = statusFilter === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setFilter(value)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    active
+                      ? "bg-[#1f7a6c] text-white"
+                      : "border border-[#0c1a1f]/12 text-[#1a333c] hover:bg-[#0c1a1f]/5"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="min-w-[min(100%,16rem)] flex-1 sm:max-w-xs">
+            <Input
+              type="search"
+              value={nameInput}
+              placeholder="Search by name"
+              aria-label="Search equipment by name"
+              onChange={(event) => setNameInput(event.target.value)}
+            />
+          </div>
         </div>
 
         {error ? <p className="text-sm text-[#b42318]">{error}</p> : null}
@@ -225,7 +261,11 @@ export function EquipmentListPage() {
           rows={items}
           getRowKey={(item) => item.id}
           loading={loading}
-          emptyMessage="No equipment found. Add one to get started."
+          emptyMessage={
+            nameFilter
+              ? "No equipment matches that name."
+              : "No equipment found. Add one to get started."
+          }
           pagination={{
             page,
             pageSize: PAGE_SIZE,

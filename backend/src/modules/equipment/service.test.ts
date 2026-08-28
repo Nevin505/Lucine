@@ -87,6 +87,19 @@ describe("listEquipment", () => {
     );
     expect(count).toHaveBeenCalledWith({ where: { status: "RETIRED" } });
   });
+
+  it("filters by name when provided", async () => {
+    await listEquipment({ page: 1, pageSize: 20, name: "auto" });
+
+    expect(findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { name: { contains: "auto", mode: "insensitive" } },
+      }),
+    );
+    expect(count).toHaveBeenCalledWith({
+      where: { name: { contains: "auto", mode: "insensitive" } },
+    });
+  });
 });
 
 describe("getEquipment", () => {

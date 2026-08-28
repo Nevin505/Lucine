@@ -46,6 +46,7 @@ export type EquipmentListResponse = {
 
 export type ListEquipmentParams = {
   status?: EquipmentStatus;
+  name?: string;
   page?: number;
   pageSize?: number;
 };

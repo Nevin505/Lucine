@@ -21,7 +21,13 @@ function isUniqueCodeConflict(err: unknown): boolean {
 }
 
 export async function listEquipment(query: ListEquipmentQuery) {
-  const where = query.status ? { status: query.status } : undefined;
+  const nameQuery = query.name?.trim();
+  const where: Prisma.EquipmentWhereInput = {
+    ...(query.status ? { status: query.status } : {}),
+    ...(nameQuery
+      ? { name: { contains: nameQuery, mode: "insensitive" } }
+      : {}),
+  };
   const skip = (query.page - 1) * query.pageSize;
 
   const [items, total] = await Promise.all([
